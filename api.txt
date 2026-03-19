@@ -1,0 +1,495 @@
+================================================================================
+  API REFERENCE FlowMango
+================================================================================
+
+--------------------------------------------------------------------------------
+  CameraBounds
+--------------------------------------------------------------------------------
+
+CameraBounds::new(min_x: f32, max_x: f32, min_y: f32, max_y: f32) -> Self
+CameraBounds::clamp_position(&self, pos: (f32, f32, f32)) -> (f32, f32, f32)
+
+Fields:
+  min_x: f32
+  max_x: f32
+  min_y: f32
+  max_y: f32
+
+--------------------------------------------------------------------------------
+  Camera
+--------------------------------------------------------------------------------
+
+Camera::new(position: (f32, f32, f32)) -> Self
+Camera::default() -> Self
+Camera::set_position(&mut self, pos: (f32, f32, f32))
+Camera::get_position(&self) -> (f32, f32, f32)
+Camera::set_zoom(&mut self, zoom: f32)
+Camera::get_zoom(&self) -> f32
+Camera::follow(&mut self, target_id: String, smoothing: f32)
+Camera::stop_following(&mut self)
+Camera::get_follow_target(&self) -> Option<&String>
+Camera::set_bounds(&mut self, bounds: CameraBounds)
+Camera::clear_bounds(&mut self)
+Camera::get_bounds(&self) -> Option<&CameraBounds>
+Camera::shake(&mut self, intensity: f32, duration: f32)
+Camera::is_visible(&self, position: (f32, f32), size: (f32, f32), viewport_size: (f32, f32)) -> bool
+
+  (pub(crate) — internal use)
+Camera::update_follow(&mut self, target_pos: (f32, f32, f32))
+Camera::update_shake(&mut self, delta_time: f32)
+Camera::calculate_layer_offset(&self, parallax_factor: f32) -> (f32, f32)
+
+--------------------------------------------------------------------------------
+  LayerId
+--------------------------------------------------------------------------------
+
+LayerId(pub usize)
+
+  Derives: Debug, Clone, Copy, PartialEq, Eq, Hash
+
+--------------------------------------------------------------------------------
+  Layer
+--------------------------------------------------------------------------------
+
+Layer::new(ctx: &mut Context, mode: CanvasMode, depth: f32, parallax: f32, id: LayerId) -> Self
+Layer::set_parallax(&mut self, factor: f32)
+Layer::get_parallax(&self) -> f32
+Layer::set_visible(&mut self, visible: bool)
+Layer::is_visible(&self) -> bool
+Layer::get_depth(&self) -> f32
+Layer::get_id(&self) -> LayerId
+Layer::camera_offset(&self) -> (f32, f32)
+Layer::set_camera_offset(&mut self, offset: (f32, f32))
+Layer::canvas(&self) -> &Canvas
+Layer::canvas_mut(&mut self) -> &mut Canvas
+
+--------------------------------------------------------------------------------
+  WorldObject
+--------------------------------------------------------------------------------
+
+WorldObject::new(
+    ctx: &mut Context,
+    id: String,
+    image: Option<Image>,
+    size: f32,
+    position: (f32, f32, f32),
+    layer_id: LayerId,
+    tags: Vec<String>,
+    momentum: (f32, f32, f32),
+    resistance: (f32, f32, f32),
+    gravity: f32,
+) -> Self
+
+WorldObject::new_rect(
+    ctx: &mut Context,
+    id: String,
+    image: Option<Image>,
+    size: (f32, f32),
+    position: (f32, f32, f32),
+    layer_id: LayerId,
+    tags: Vec<String>,
+    momentum: (f32, f32, f32),
+    resistance: (f32, f32, f32),
+    gravity: f32,
+) -> Self
+
+  Builder methods (consume self):
+WorldObject::with_depth_scaling(self, enabled: bool) -> Self
+WorldObject::with_shadow(self, shadow: Shadow) -> Self
+WorldObject::with_animation(self, animation: AnimatedSprite) -> Self
+WorldObject::as_platform(self) -> Self
+
+  Position & layer:
+WorldObject::get_world_position(&self) -> (f32, f32, f32)
+WorldObject::set_world_position(&mut self, position: (f32, f32, f32))
+WorldObject::get_z_position(&self) -> f32
+WorldObject::set_z_position(&mut self, z: f32)
+WorldObject::get_layer_id(&self) -> LayerId
+WorldObject::set_layer_id(&mut self, layer_id: LayerId)
+
+  Scale & depth:
+WorldObject::calculate_scale(&self) -> (f32, f32)
+WorldObject::get_base_scale(&self) -> (f32, f32)
+WorldObject::has_depth_scaling(&self) -> bool
+
+  Identity & tags:
+WorldObject::get_id(&self) -> &str
+WorldObject::get_tags(&self) -> &[String]
+WorldObject::has_tag(&self, tag: &str) -> bool
+
+  Visibility:
+WorldObject::is_visible(&self) -> bool
+WorldObject::set_visible(&mut self, visible: bool)
+
+  Shadow:
+WorldObject::get_shadow(&self) -> Option<&Shadow>
+WorldObject::set_shadow(&mut self, shadow: Option<Shadow>)
+
+  Inner game object:
+WorldObject::game_object(&self) -> &GameObject
+WorldObject::game_object_mut(&mut self) -> &mut GameObject
+
+--------------------------------------------------------------------------------
+  Shadow
+--------------------------------------------------------------------------------
+
+Shadow::new(offset: (f32, f32), scale: f32, opacity: f32) -> Self
+Shadow::default() -> Self                         // alias: default_drop_shadow
+Shadow::default_drop_shadow() -> Self             // offset (5,10), scale 0.8, opacity 0.3
+Shadow::ground_shadow() -> Self                   // offset (0,0),  scale 1.0, opacity 0.4
+Shadow::long_shadow(direction: (f32, f32)) -> Self
+
+Shadow::set_opacity(&mut self, opacity: f32)
+Shadow::set_color(&mut self, color: Rgba<u8>)
+Shadow::calculate_position(&self, obj_pos: (f32, f32), obj_size: (f32, f32)) -> (f32, f32)
+Shadow::calculate_size(&self, obj_size: (f32, f32)) -> (f32, f32)
+
+Fields:
+  offset:  (f32, f32)
+  scale:   f32
+  opacity: f32
+  color:   Rgba<u8>
+
+--------------------------------------------------------------------------------
+  WorldEvent  (enum)
+--------------------------------------------------------------------------------
+
+Variants:
+
+  KeyPress      { key: Key, action: Action, target: Target }
+  KeyRelease    { key: Key, action: Action, target: Target }
+  LayerCollision   { action: Action, target: Target, layer: LayerId }
+  LayerEnter       { action: Action, target: Target, layer: LayerId }
+  LayerExit        { action: Action, target: Target, layer: LayerId }
+  CameraEnter      { action: Action, target: Target }
+  CameraExit       { action: Action, target: Target }
+  BoundaryCollision{ action: Action, target: Target, layer: LayerId }
+  GlobalCollision  { action: Action, target: Target, with_target: Target }
+
+Methods:
+
+WorldEvent::get_target(&self) -> &Target
+WorldEvent::get_action(&self) -> &Action
+WorldEvent::get_layer(&self) -> Option<LayerId>
+WorldEvent::get_key(&self) -> Option<&Key>
+WorldEvent::is_key_press(&self) -> bool
+WorldEvent::is_key_release(&self) -> bool
+
+--------------------------------------------------------------------------------
+  Scene
+--------------------------------------------------------------------------------
+
+  Construction:
+Scene::new(ctx: &mut Context, mode: CanvasMode, num_layers: usize) -> Self
+
+  World objects:
+Scene::add_object(&mut self, object: WorldObject)
+Scene::remove_object(&mut self, id: &str) -> Option<WorldObject>
+Scene::get_object(&self, id: &str) -> Option<&WorldObject>
+Scene::get_object_mut(&mut self, id: &str) -> Option<&mut WorldObject>
+Scene::get_objects_by_tag(&self, tag: &str) -> Vec<&WorldObject>
+Scene::get_objects_by_tag_mut(&mut self, tag: &str) -> Vec<&mut WorldObject>
+
+  Layers:
+Scene::get_layer(&self, id: LayerId) -> Option<&Layer>
+Scene::get_layer_mut(&mut self, id: LayerId) -> Option<&mut Layer>
+Scene::layer_count(&self) -> usize
+Scene::add_layer(&mut self, ctx: &mut Context, depth: f32, parallax_factor: f32) -> LayerId
+Scene::get_canvases(&self) -> Vec<&Canvas>
+Scene::get_canvases_mut(&mut self) -> Vec<&mut Canvas>
+
+  Camera:
+Scene::camera(&self) -> &Camera
+Scene::camera_mut(&mut self) -> &mut Camera
+Scene::set_camera_follow(&mut self, target_id: String, smoothing: f32)
+
+  Input:
+Scene::is_key_held(&self, key: &Key) -> bool
+
+  Events:
+Scene::add_event(&mut self, event: WorldEvent)
+Scene::on_tick<F: FnMut(&mut Scene) + Clone + 'static>(&mut self, callback: F)
+
+  Collision queries:
+Scene::collision_on_layer(&self, t1: &Target, t2: &Target, layer_id: LayerId) -> bool
+
+  Update & execution:
+Scene::update(&mut self, ctx: &mut Context)
+Scene::run(&mut self, action: Action)
+
+  Utility:
+Scene::get_mode(&self) -> CanvasMode
+Scene::get_virtual_size(&self) -> (f32, f32)
+  // Landscape -> (3840.0, 2160.0)
+  // Portrait  -> (2160.0, 3840.0)
+
+--------------------------------------------------------------------------------
+  Re-exports (from quartz)
+--------------------------------------------------------------------------------
+
+  Action
+  AnimatedSprite
+  Anchor
+  Canvas
+  CanvasMode
+  Condition
+  Context
+  GameEvent
+  GameObject
+  Image
+  Key
+  Location
+  ShapeType
+  Target
+
+================================================================================
+
+
+
+
+
+QUARTZ is also accessible, here are it's API:
+
+============================================================
+CANVAS
+============================================================
+
+Canvas::new(ctx: &mut Context, mode: CanvasMode) -> Self
+Canvas::add_game_object(&mut self, name: String, game_obj: GameObject)
+Canvas::remove_game_object(&mut self, name: &str)
+Canvas::get_game_object(&self, name: &str) -> Option<&GameObject>
+Canvas::get_game_object_mut(&mut self, name: &str) -> Option<&mut GameObject>
+Canvas::run(&mut self, action: Action)
+Canvas::add_event(&mut self, event: GameEvent, target: Target)
+Canvas::collision_between(&self, target1: &Target, target2: &Target) -> bool
+Canvas::objects_in_radius(&self, game_object: &GameObject, radius_px: f32) -> Vec<&GameObject>
+Canvas::handle_infinite_scroll(&mut self)
+Canvas::get_virtual_size(&self) -> (f32, f32)
+Canvas::on_tick<F>(&mut self, callback: F)  where F: FnMut(&mut Canvas) + Clone + 'static
+Canvas::on_key_press(&mut self, cb: impl FnMut(&mut Canvas, &Key) + Clone + 'static)
+Canvas::on_key_release(&mut self, cb: impl FnMut(&mut Canvas, &Key) + Clone + 'static)
+Canvas::on_mouse_press(&mut self, cb: impl FnMut(&mut Canvas, MouseButton, (f32, f32)) + Clone + 'static)
+Canvas::on_mouse_release(&mut self, cb: impl FnMut(&mut Canvas, MouseButton, (f32, f32)) + Clone + 'static)
+Canvas::on_mouse_move(&mut self, cb: impl FnMut(&mut Canvas, (f32, f32)) + Clone + 'static)
+Canvas::on_mouse_scroll(&mut self, cb: impl FnMut(&mut Canvas, (f32, f32)) + Clone + 'static)
+Canvas::mouse_position(&self) -> Option<(f32, f32)>
+Canvas::is_key_held(&self, key: &Key) -> bool
+Canvas::play_sound(&self, file_path: &str)
+Canvas::set_camera(&mut self, camera: Camera)
+Canvas::clear_camera(&mut self)
+Canvas::camera(&self) -> Option<&Camera>
+Canvas::camera_mut(&mut self) -> Option<&mut Camera>
+Canvas::register_custom_event<F>(&mut self, name: String, handler: F)  where F: FnMut(&mut Canvas) + Clone + 'static
+Canvas::add_scene(&mut self, scene: Scene)
+Canvas::load_scene(&mut self, name: &str)
+Canvas::active_scene(&self) -> Option<&str>
+Canvas::is_scene(&self, name: &str) -> bool
+Canvas::screen_to_virtual(&self, screen_pos: (f32, f32)) -> (f32, f32)
+
+============================================================
+CANVAS MODE
+============================================================
+
+CanvasMode::Landscape
+CanvasMode::Portrait
+CanvasMode::Fullscreen
+
+============================================================
+GAME OBJECT
+============================================================
+
+GameObject::new(ctx, id: String, drawable: Option<impl Drawable + 'static>, size: f32, position: (f32, f32), tags: Vec<String>, momentum: (f32, f32), resistance: (f32, f32), gravity: f32) -> Self
+GameObject::new_rect(ctx, id: String, drawable: Option<impl Drawable + 'static>, size: (f32, f32), position: (f32, f32), tags: Vec<String>, momentum: (f32, f32), resistance: (f32, f32), gravity: f32) -> Self
+GameObject::with_animation(self, animated_sprite: AnimatedSprite) -> Self
+GameObject::with_image(self, image: Image) -> Self
+GameObject::as_platform(self) -> Self
+GameObject::with_tag(self, tag: impl Into<String>) -> Self
+GameObject::with_tags(self, tags: Vec<String>) -> Self
+GameObject::with_gravity(self, gravity: f32) -> Self
+GameObject::with_momentum(self, momentum: (f32, f32)) -> Self
+GameObject::with_resistance(self, resistance: (f32, f32)) -> Self
+GameObject::set_gravity(&mut self, gravity: f32)
+GameObject::set_animation(&mut self, animated_sprite: AnimatedSprite)
+GameObject::set_image(&mut self, image: Image)
+GameObject::update_position(&mut self)
+GameObject::apply_gravity(&mut self)
+GameObject::apply_resistance(&mut self)
+GameObject::update_animation(&mut self, delta_time: f32)
+GameObject::update_image_shape(&mut self)
+GameObject::check_boundary_collision(&self, canvas_size: (f32, f32)) -> bool
+GameObject::get_anchor_position(&self, anchor: Anchor) -> (f32, f32)
+GameObject::contains_point(&self, point: (f32, f32)) -> bool
+
+Fields:
+  id: String
+  tags: Vec<String>
+  size: (f32, f32)
+  position: (f32, f32)
+  momentum: (f32, f32)
+  resistance: (f32, f32)
+  gravity: f32
+  is_platform: bool
+  visible: bool
+  animated_sprite: Option<AnimatedSprite>
+
+============================================================
+TARGET
+============================================================
+
+Target::ByName(String)
+Target::ById(String)
+Target::ByTag(String)
+Target::name(s: impl Into<String>) -> Self
+Target::id(s: impl Into<String>) -> Self
+Target::tag(s: impl Into<String>) -> Self
+
+============================================================
+LOCATION
+============================================================
+
+Location::Position((f32, f32))
+Location::Between(Box<Target>, Box<Target>)
+Location::AtTarget(Box<Target>)
+Location::Relative { target: Box<Target>, offset: (f32, f32) }
+Location::OnTarget { target: Box<Target>, anchor: Anchor, offset: (f32, f32) }
+Location::at(x: f32, y: f32) -> Self
+
+============================================================
+ANCHOR
+============================================================
+
+Anchor { x: f32, y: f32 }
+
+============================================================
+ACTION
+============================================================
+
+Action::ApplyMomentum { target: Target, value: (f32, f32) }
+Action::SetMomentum { target: Target, value: (f32, f32) }
+Action::SetResistance { target: Target, value: (f32, f32) }
+Action::Remove { target: Target }
+Action::Spawn { object: Box<GameObject>, location: Location }
+Action::TransferMomentum { from: Target, to: Target, scale: f32 }
+Action::SetAnimation { target: Target, animation_bytes: &'static [u8], fps: f32 }
+Action::Teleport { target: Target, location: Location }
+Action::Show { target: Target }
+Action::Hide { target: Target }
+Action::Toggle { target: Target }
+Action::Conditional { condition: Condition, if_true: Box<Action>, if_false: Option<Box<Action>> }
+Action::Custom { name: String }
+
+============================================================
+CONDITION
+============================================================
+
+Condition::Always
+Condition::KeyHeld(Key)
+Condition::KeyNotHeld(Key)
+Condition::Collision(Target)
+Condition::NoCollision(Target)
+Condition::And(Box<Condition>, Box<Condition>)
+Condition::Or(Box<Condition>, Box<Condition>)
+Condition::Not(Box<Condition>)
+Condition::IsVisible(Target)
+Condition::IsHidden(Target)
+
+============================================================
+GAME EVENT
+============================================================
+
+GameEvent::Collision { action: Action, target: Target }
+GameEvent::BoundaryCollision { action: Action, target: Target }
+GameEvent::KeyPress { key: Key, action: Action, target: Target }
+GameEvent::KeyRelease { key: Key, action: Action, target: Target }
+GameEvent::KeyHold { key: Key, action: Action, target: Target }
+GameEvent::Tick { action: Action, target: Target }
+GameEvent::Custom { name: String, target: Target }
+GameEvent::MousePress { action: Action, target: Target, button: Option<MouseButton> }
+GameEvent::MouseRelease { action: Action, target: Target, button: Option<MouseButton> }
+GameEvent::MouseEnter { action: Action, target: Target }
+GameEvent::MouseLeave { action: Action, target: Target }
+GameEvent::MouseOver { action: Action, target: Target }
+GameEvent::MouseScroll { action: Action, target: Target, axis: Option<ScrollAxis> }
+GameEvent::MouseMove { action: Action, target: Target }
+
+GameEvent::is_key_press(&self) -> bool
+GameEvent::is_key_release(&self) -> bool
+GameEvent::is_key_hold(&self) -> bool
+GameEvent::is_tick(&self) -> bool
+GameEvent::is_custom(&self) -> bool
+GameEvent::is_mouse_press(&self) -> bool
+GameEvent::is_mouse_release(&self) -> bool
+GameEvent::is_mouse_enter(&self) -> bool
+GameEvent::is_mouse_leave(&self) -> bool
+GameEvent::is_mouse_over(&self) -> bool
+GameEvent::is_mouse_scroll(&self) -> bool
+GameEvent::is_mouse_move(&self) -> bool
+GameEvent::key(&self) -> Option<&Key>
+GameEvent::action(&self) -> &Action
+GameEvent::custom_name(&self) -> Option<&str>
+
+============================================================
+MOUSE BUTTON
+============================================================
+
+MouseButton::Left
+MouseButton::Right
+MouseButton::Middle
+
+============================================================
+SCROLL AXIS
+============================================================
+
+ScrollAxis::Up
+ScrollAxis::Down
+ScrollAxis::Left
+ScrollAxis::Right
+
+============================================================
+ANIMATED SPRITE
+============================================================
+
+AnimatedSprite::new(gif_bytes: &[u8], size: (f32, f32), fps: f32) -> Result<Self, String>
+AnimatedSprite::from_frames(frames: Vec<RgbaImage>, size: (f32, f32), fps: f32) -> Self
+AnimatedSprite::update(&mut self, delta_time: f32)
+AnimatedSprite::get_current_image(&self) -> Image
+AnimatedSprite::set_fps(&mut self, fps: f32)
+AnimatedSprite::reset(&mut self)
+AnimatedSprite::frame_count(&self) -> usize
+AnimatedSprite::set_frame(&mut self, frame: usize)
+
+============================================================
+CAMERA
+============================================================
+
+Camera::new(world_size: (f32, f32), viewport_size: (f32, f32)) -> Self
+Camera::follow(&mut self, target: Option<Target>)
+Camera::center_on(&mut self, wx: f32, wy: f32)
+Camera::lerp_toward(&mut self, wx: f32, wy: f32)  [pub(crate)]
+
+Fields:
+  position: (f32, f32)
+  world_size: (f32, f32)
+  lerp_speed: f32
+
+============================================================
+SCENE
+============================================================
+
+Scene::new(name: impl Into<String>) -> Self
+Scene::with_object(self, name: impl Into<String>, obj: GameObject) -> Self
+Scene::with_event(self, event: GameEvent, target: Target) -> Self
+Scene::on_enter<F>(self, f: F) -> Self  where F: FnMut(&mut Canvas) + Clone + 'static
+Scene::on_exit<F>(self, f: F) -> Self   where F: FnMut(&mut Canvas) + Clone + 'static
+
+Fields:
+  name: String
+
+============================================================
+SCENE MANAGER
+============================================================
+
+SceneManager::new() -> Self
+SceneManager::add_scene(&mut self, scene: Scene)
+SceneManager::active_scene(&self) -> Option<&str>
+SceneManager::has_scene(&self, name: &str) -> bool

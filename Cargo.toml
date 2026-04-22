@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 image = "0.25.9"
-prism = {version = "0.1.2", package = "prism2"}
+prism  = { package = "prism2", path = "../prism" }
 quartz = { path = "../quartz"}

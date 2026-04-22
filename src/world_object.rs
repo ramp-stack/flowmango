@@ -19,7 +19,7 @@ impl OnEvent for WorldObject {}
 
 impl From<GameObject> for WorldObject {
     fn from(go: GameObject) -> Self {
-        let layer_id = LayerId(go.layer.unwrap_or(0) as usize);
+        let layer_id = LayerId(go.layer as usize);
         let size     = go.size;
         Self {
             layout:      Stack::default(),

@@ -15,20 +15,23 @@ pub struct Scene {
     key_events: Vec<WorldEvent>,
     tick_callbacks: Vec<Box<dyn SceneCallback>>,
     held_keys: Arc<Mutex<std::collections::HashSet<Key>>>,
+    // Stores the actual window size for Fullscreen mode, updated each layout pass
+    fullscreen_size: Arc<Mutex<(f32, f32)>>,
 }
 
 impl Clone for Scene {
     fn clone(&self) -> Self {
         Self {
-            layout:         self.layout.clone(),
-            world_objects:  self.world_objects.clone(),
-            layers:         self.layers.clone(),
-            camera:         self.camera.clone(),
-            mode:           self.mode,
-            events:         self.events.clone(),
-            key_events:     self.key_events.clone(),
-            tick_callbacks: self.tick_callbacks.clone(),
-            held_keys:      self.held_keys.clone(),
+            layout:          self.layout.clone(),
+            world_objects:   self.world_objects.clone(),
+            layers:          self.layers.clone(),
+            camera:          self.camera.clone(),
+            mode:            self.mode,
+            events:          self.events.clone(),
+            key_events:      self.key_events.clone(),
+            tick_callbacks:  self.tick_callbacks.clone(),
+            held_keys:       self.held_keys.clone(),
+            fullscreen_size: self.fullscreen_size.clone(),
         }
     }
 }
@@ -36,10 +39,10 @@ impl Clone for Scene {
 impl std::fmt::Debug for Scene {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Scene")
-            .field("layers",       &self.layers)
-            .field("camera",       &self.camera)
-            .field("world_objects",&self.world_objects)
-            .field("mode",         &self.mode)
+            .field("layers",        &self.layers)
+            .field("camera",        &self.camera)
+            .field("world_objects", &self.world_objects)
+            .field("mode",          &self.mode)
             .finish()
     }
 }
@@ -73,6 +76,16 @@ impl OnEvent for Scene {
         _tree: &SizedTree,
         event: Box<dyn Event>,
     ) -> Vec<Box<dyn Event>> {
+       
+        if self.mode == CanvasMode::Fullscreen {
+            if let Some(layer) = self.layers.iter().find(|l| l.is_visible()) {
+                let size = layer.canvas().canvas_size();
+                if size.0 > 0.0 && size.1 > 0.0 {
+                    *self.fullscreen_size.lock().unwrap() = size;
+                }
+            }
+        }
+
         vec![event]
     }
 }
@@ -102,15 +115,16 @@ impl Scene {
         }
 
         Self {
-            layout:         Stack::default(),
+            layout:          Stack::default(),
             layers,
-            camera:         Camera::default(),
-            world_objects:  std::collections::HashMap::new(),
+            camera:          Camera::default(),
+            world_objects:   std::collections::HashMap::new(),
             mode,
-            events:         Vec::new(),
-            key_events:     Vec::new(),
-            tick_callbacks: Vec::new(),
+            events:          Vec::new(),
+            key_events:      Vec::new(),
+            tick_callbacks:  Vec::new(),
             held_keys,
+            fullscreen_size: Arc::new(Mutex::new((0.0, 0.0))),
         }
     }
 
@@ -176,8 +190,8 @@ impl Scene {
         id
     }
 
-    pub fn camera(&self)         -> &Camera      { &self.camera }
-    pub fn camera_mut(&mut self) -> &mut Camera  { &mut self.camera }
+    pub fn camera(&self)         -> &Camera     { &self.camera }
+    pub fn camera_mut(&mut self) -> &mut Camera { &mut self.camera }
 
     pub fn set_camera_follow(&mut self, target_id: String, smoothing: f32) {
         self.camera.follow(target_id, smoothing);
@@ -403,9 +417,9 @@ impl Scene {
 
     fn resolve_target_ids(&self, target: &Target, layer_filter: Option<LayerId>) -> Vec<String> {
         match target {
-            Target::ById(id)    => vec![id.clone()],
-            Target::ByName(name)=> vec![name.clone()],
-            Target::ByTag(tag)  => self
+            Target::ById(id)     => vec![id.clone()],
+            Target::ByName(name) => vec![name.clone()],
+            Target::ByTag(tag)   => self
                 .world_objects.values()
                 .filter(|o| o.has_tag(tag) && layer_filter.map_or(true, |l| o.get_layer_id() == l))
                 .map(|o| o.get_id().to_string())
@@ -428,11 +442,11 @@ impl Scene {
 
     fn objects_for_target<'a>(&'a self, target: &Target, layer_id: LayerId) -> Vec<&'a WorldObject> {
         match target {
-            Target::ById(id)    => self.world_objects.get(id.as_str())
+            Target::ById(id)     => self.world_objects.get(id.as_str())
                 .filter(|o| o.get_layer_id() == layer_id).into_iter().collect(),
-            Target::ByName(name)=> self.world_objects.get(name.as_str())
+            Target::ByName(name) => self.world_objects.get(name.as_str())
                 .filter(|o| o.get_layer_id() == layer_id).into_iter().collect(),
-            Target::ByTag(tag)  => self.world_objects.values()
+            Target::ByTag(tag)   => self.world_objects.values()
                 .filter(|o| o.has_tag(tag) && o.get_layer_id() == layer_id).collect(),
         }
     }
@@ -448,11 +462,34 @@ impl Scene {
 
     pub fn get_mode(&self) -> CanvasMode { self.mode }
 
+    /// Returns the virtual size of the scene.
+    ///
+    /// - `Landscape`  → fixed 3840×2160
+    /// - `Portrait`   → fixed 2160×3840
+    /// - `Fullscreen` → the actual window size, captured from the layer's
+    ///                  `CanvasLayout::canvas_size` cell each frame via
+    ///                  `on_event`. Falls back to the layer directly if the
+    ///                  cached value has not been populated yet.
     pub fn get_virtual_size(&self) -> (f32, f32) {
         match self.mode {
             CanvasMode::Landscape  => (3840.0, 2160.0),
             CanvasMode::Portrait   => (2160.0, 3840.0),
-            CanvasMode::Fullscreen => todo!(),
+            CanvasMode::Fullscreen => {
+                // Prefer the value kept in sync by on_event
+                let cached = *self.fullscreen_size.lock().unwrap();
+                if cached.0 > 0.0 && cached.1 > 0.0 {
+                    return cached;
+                }
+                // Fallback: read directly from the first visible layer's canvas layout
+                self.layers
+                    .iter()
+                    .find(|l| l.is_visible())
+                    .map(|l| {
+                        let size = l.canvas().canvas_size();
+                        if size.0 > 0.0 { size } else { (0.0, 0.0) }
+                    })
+                    .unwrap_or((0.0, 0.0))
+            }
         }
     }
 
